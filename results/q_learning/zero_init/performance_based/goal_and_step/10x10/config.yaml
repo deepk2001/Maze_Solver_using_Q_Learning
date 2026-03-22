@@ -1,0 +1,31 @@
+agent: Q-learning
+evaluation:
+  display: true
+  enabled: true
+  episodes: 1
+  fps: 8
+  max_steps: 50
+  num_videos: 4
+  save_video: true
+  video_heatmap: true
+hyperparameters:
+  discount_rate: 0.99
+  epsilon: 1.0
+  epsilon_decay: 0.99
+  epsilon_min: 0.05
+  epsilon_policy: performance_based
+  learning_rate: 0.1
+  q_init_strategy: zero
+maze_file: mazes/10x10.txt
+reward:
+  goal_reward: 1.0
+  mode: goal_and_step
+  step_penalty: -0.01
+training:
+  episodes: 400
+  max_steps: 200
+  render: false
+  render_heatmap: true
+viz:
+  num_plots: 4
+  window_size: null

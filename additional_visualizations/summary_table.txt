@@ -1,0 +1,30 @@
+====================================================================================================
+EXPERIMENT SUMMARY (sorted by average reward)
+====================================================================================================
+Algo         Init                 Policy             Reward         Avg R    Max R    Avg Steps  Time(s)   
+----------------------------------------------------------------------------------------------------
+q_learning   random_negative_init performance_based  manhattan      2.16     2.51     40.6       260.3     
+q_learning   zero_init            decay              manhattan      2.16     2.51     42.6       85.1      
+dqn          random_negative_init performance_based  manhattan      1.57     2.51     75.4       100.8     
+q_learning   zero_init            performance_based  manhattan      1.51     2.51     72.4       478.5     
+dqn          zero_init            decay              manhattan      1.50     2.51     80.2       106.6     
+q_learning   random_negative_init decay              manhattan      1.29     2.51     84.9       546.4     
+dqn          zero_init            performance_based  manhattan      1.27     2.51     93.8       127.7     
+q_learning   zero_init            performance_based  goal_only      0.60     1.00     103.8      412.0     
+dqn          zero_init            performance_based  goal_only      0.16     1.00     186.1      353.6     
+dqn          zero_init            decay              goal_only      0.09     1.00     192.9      372.6     
+dqn          random_negative_init decay              manhattan      0.08     2.50     153.3      207.1     
+dqn          random_negative_init decay              goal_only      0.06     1.00     195.3      351.8     
+dqn          random_negative_init performance_based  goal_only      0.06     1.00     196.5      389.5     
+q_learning   zero_init            decay              goal_and_step  0.03     0.81     76.1       283.2     
+q_learning   random_negative_init performance_based  goal_only      0.01     1.00     199.4      819.0     
+q_learning   random_negative_init decay              goal_only      0.00     1.00     200.0      811.6     
+q_learning   zero_init            decay              goal_only      0.00     1.00     199.9      687.2     
+q_learning   random_negative_init decay              goal_and_step  -0.37    0.81     101.0      318.1     
+q_learning   zero_init            performance_based  goal_and_step  -0.55    0.81     112.4      1.0       
+q_learning   random_negative_init performance_based  goal_and_step  -1.22    0.79     154.9      1.3       
+dqn          zero_init            performance_based  goal_and_step  -1.78    0.47     190.3      248.0     
+dqn          zero_init            decay              goal_and_step  -1.98    0.30     199.1      256.3     
+dqn          random_negative_init performance_based  goal_and_step  -1.99    0.22     199.6      265.0     
+dqn          random_negative_init decay              goal_and_step  -1.99    0.18     199.7      271.4     
+====================================================================================================

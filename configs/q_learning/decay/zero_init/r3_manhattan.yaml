@@ -1,0 +1,38 @@
+agent: "Q-learning"
+maze_file: "mazes/10x10.txt"
+
+reward:
+  mode: "manhattan"
+  goal_reward: 1.0
+  eta: 0.01
+  beta: 0.1
+
+hyperparameters:
+  learning_rate: 0.10
+  discount_rate: 0.99
+  q_init_strategy: "zero"
+  epsilon_policy: "decay"
+  epsilon: 1.0
+  epsilon_min: 0.05
+  epsilon_decay: 0.995
+
+training:
+  episodes: 800
+  max_steps: 200
+  render: True
+  render_heatmap: True
+
+evaluation:
+  enabled: True
+  num_videos: 5
+  episodes: 1
+  max_steps: 50
+  save_video: True
+  video_heatmap: True
+  display: True
+  fps: 8
+
+viz:
+  num_plots: 4
+  window_size: null
+

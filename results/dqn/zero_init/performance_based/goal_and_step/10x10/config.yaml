@@ -1,0 +1,35 @@
+agent: DQN
+device: cuda
+evaluation:
+  display: true
+  enabled: true
+  episodes: 1
+  fps: 8
+  max_steps: 50
+  num_videos: 5
+  save_video: true
+  video_heatmap: true
+hyperparameters:
+  batch_size: 512
+  discount_rate: 0.99
+  epsilon: 1.0
+  epsilon_decay: 0.99
+  epsilon_min: 0.05
+  epsilon_policy: performance_based
+  hidden_size: 256
+  learning_rate: 0.001
+  q_init_strategy: zero
+  target_update: 10
+maze_file: mazes/10x10.txt
+reward:
+  goal_reward: 1.0
+  mode: goal_and_step
+  step_penalty: -0.01
+training:
+  episodes: 500
+  max_steps: 200
+  render: false
+  render_heatmap: true
+viz:
+  num_plots: 4
+  window_size: null

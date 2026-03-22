@@ -1,0 +1,972 @@
+\documentclass[12pt]{article}
+% Specifies the document class
+\newcommand{\ip}[2]{(#1, #2)}
+\usepackage{titlesec}
+\usepackage{longtable}
+\usepackage[colorlinks]{hyperref}
+\usepackage{graphicx}  
+\usepackage{listings}
+\usepackage{subfigure,fullpage}
+\titleformat*{\section}{\Large\bfseries}
+\titleformat*{\subsection}{\normalsize\bfseries}
+\usepackage{amsmath}
+\usepackage{setspace}
+\usepackage{float}
+\usepackage{caption}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    filecolor=black,
+    urlcolor=black,
+    citecolor=black
+}
+
+\begin{document}        
+% End of preamble and beginning of text.
+\begin{spacing}{2}
+\begin{center}
+\textbf{\Large{Project \#3:} Reinforcement Learning: \\
+Robot in a MAZE}\\
+CSE583/EE552 Pattern Recognition and Machine Learning, Spring 2026\\
+
+Release Date: Tuesday, March 3, 2026\\
+Final Due Date: Friday, March 20, 2026
+\end{center}
+\end{spacing}
+\begin{center}
+% Final 
+Professor: Yanxi Liu (yul11@psu.edu)\\
+LA: Jiapeng Yu jfy5396@psu.edu\\
+TA: Keaton Kraiger kbk5531@psu.edu\\
+\end{center}
+
+\tableofcontents
+% Break until the next page
+\vfill
+\pagebreak
+
+
+\section{Introduction}
+
+This project studies reinforcement learning in the context of a maze navigation task. 
+The objective is to design an agent that learns a {\em policy} to reach a desired goal location
+using {\bf\em Q-learning}. %through interaction with the environment. 
+We implement both the Classic tabular Q-learning and Deep Q-Network (DQN) approaches to compare their learning behavior and performance.
+
+\subsection{Reinforcement Learning Framework}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\linewidth]{figure/SP26_Figures/Project3_fig1.png}
+  \caption{High-level illustration of the agent-environment interaction loop in reinforcement learning, where the agent observes, acts, and receives rewards from the environment.}
+  \label{fig:High_level}
+\end{figure}
+
+In the RL framework, an agent is the decision-maker or learner. The agent interacts with the environment by taking actions based on its current knowledge. A state represents the environment at a given time, and the agent uses this information to decide the next action. An action is a choice made by the agent that affects the environment's state. Actions are selected based on a policy, which is refined over time. Figure \ref{fig:High_level} provides a high-level illustration of the agent-environment interaction in reinforcement learning.
+
+\begin{itemize}
+
+  \item \textbf{Environment (Right):} Depicted as the Earth, the environment is everything external to the agent. It receives the agent's actions and, in response, transitions to a new state and produces rewards.
+  
+  \begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\linewidth]{figure/SP26_Figures/Environment_MDP.png}
+  \caption{Environment is modeled as a Markov Decision Process containing states, actions, transition probability, reward function and discount factor.}
+  \label{fig:Env_MDP}
+\end{figure}
+
+  \item \textbf{Agent (Left):} The stylized robot represents the learning agent. It has a goal or objective in mind, indicating what it aims to achieve.
+  \item \textbf{Policy:} The policy is the angent's behavior rule, it defines how actions are selected given states. The policy is the central object in RL
+  
+  \item{\textbf{Reward:}} After the environment executes an action, it returns a scalar reward signal that provides feedback on the agent's behavior and guides policy learning.
+
+  \item{\textbf{Value:}} is show how promising is this situation. it predicts long-term goodness. While reward is immediate, value looks into the future. 
+\end{itemize}
+
+\subsection{Exploration Versus Exploitation}
+In reinforcement learning, exploration and exploitation are two fundamental strategies that an agent must balance when learning to make decisions:
+\begin{itemize}
+  \item \textbf{Exploration:} The agent tries out new actions and visits less familiar states to gather information about the environment.
+  \item \textbf{Exploitation:} The agent leverages the knowledge it has already acquired by choosing actions that have historically led to high rewards.
+\end{itemize}
+
+Since reinforcement learning involves learning through trial and error, the agent must balance two competing goals: exploration (trying new actions) and exploitation (choosing the best-known actions). The starter code provides several exploration strategies, which you can configure using the \texttt{epsilon\_policy} argument.
+
+\paragraph{Epsilon Decay Strategy:}The agent starts with a high exploration rate $\epsilon$, encouraging it to take random actions and explore the environment. Over time, $\epsilon$ decays toward a minimum value:
+\begin{equation}
+\epsilon_t = \epsilon_{\min} + (\epsilon_{\max} - \epsilon_{\min}) \cdot \exp(-\text{decay\_rate}\cdot t).
+\end{equation}
+
+\paragraph{Performance-Based (Exploitation) Strategy.}
+In this approach, the exploration rate $\epsilon$ is adjusted based on the agent's recent performance. If the agent shows improvement (e.g., recent average rewards higher than earlier ones), then $\epsilon$ is reduced; otherwise, the agent continues to explore.
+
+\subsection{The Bellman Equation}
+A cornerstone of Reinforcement Learning is the Bellman equation, which expresses how the current estimate for state-action value $Q(s,a)$ relates to immediate rewards and future returns. In Q-learning, we approximate it via the update rule:
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\linewidth]{figure/SP25_Figures/bellman.png}
+
+\end{figure}
+
+Where:
+\begin{itemize}
+  \item $Q(s,a)$ is our current estimate of the action-value function,
+  \item $\alpha$ controls how quickly we incorporate new information,
+  \item $R(s,a)$ is the immediate reward,
+  \item $\gamma$ is the discount factor for future rewards,
+  \item $\max_{a'} Q(s',a')$ is the highest estimated value of the next state,
+  \item $Q_{\text{new}}(s,a)$ is the updated estimate.
+\end{itemize}
+
+\subsection{Classic Q-Learning}
+Q-learning is a classical, model-free method for reinforcement learning. In the context of our maze navigation problem, the Q-learning agent maintains a table, known as the Q-table, where each entry $Q(s,a)$ represents the expected cumulative reward of taking action $a$ in state $s$, and then following an optimal policy thereafter. Figure \ref{fig:Q-learning} provides an overview of the Q-learning approach.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\linewidth]{figure/SP25_Figures/high_level_q_learning.png}
+  \caption{Classic Q-learning overview.}
+  \label{fig:Q-learning}
+\end{figure}
+
+\paragraph{State Representation and Initialization.}
+
+The state $s$ represents the agent’s current configuration in the environment, which fully describes its situation for decision-making. In the maze setting, the state is defined by the agent’s grid position and encoded as the tuple $(x,y)$. 
+Initially, the Q-table is initialized with zeros for all state--action pairs, indicating no prior preference before learning from interaction.
+
+
+\textbf{Action Selection.} 
+The agent balances \emph{exploration versus exploitation} using an $\epsilon$-greedy strategy. 
+With probability $\epsilon$, it explores by selecting a random action, while with probability $1-\epsilon$, it exploits current knowledge by choosing the action with the highest Q-value in the current state.
+
+\paragraph{Q-value Update Rule.}
+When the agent takes an action $a$ in state $s$, receives a reward $r$, and transitions to a new state $s'$, the Q-value is updated using:
+\begin{equation}
+Q(s,a) \leftarrow Q(s,a) + \alpha\left( r + \gamma \max_{a'} Q(s',a') - Q(s,a) \right).
+\end{equation}
+
+
+Here:
+\begin{itemize}
+  \item $\alpha$ is the learning rate, which determines how much new experiences influence the Q-values.
+  \item $\gamma$ is the discount factor, weighting future rewards.
+  \item The environment returns a reward $r$ and a new state $s'$ after the action is executed.
+  \item The term $\max_{a'}Q(s',a')$ represents the estimated maximum future reward achievable from state $s'$. $Q(s,a)$ based on the observed reward and the maximum estimated value of the next state: $\max_{a'}Q(s',a')$.
+\end{itemize}
+
+
+This update is applied only to the Q-value corresponding to the state-action pair $(s,a)$; all other Q-values
+remain unchanged at that step.
+
+\paragraph{Loop summary:}
+Suppose the agent is in state s at coordinates $(x,y)$, take action $a$, receives reward $r$, and transitions to state $s'$. The update modifies only $Q(s,a)$ based on the observed outcome, while the Q-values for all other actions and states remain unchanged. This targeted update gradually shapes the Q-table, improving the agent’s policy over time.
+The Q-table stores a value $Q(s,a)$ ) for each state $s$ and action $a$. At each step:
+\begin{itemize}
+  \item The agent observes the current state $s$.
+  \item It selects an action $a$, typically using an exploration strategy (e.g., $\epsilon$-greedy).
+  \item The environment returns a reward $r$ and a new state $s'$ after the action is executed.
+  \item The agent updates $Q(s,a)$ based on the observed reward and the maximum estimated value of the next state: $\max_{a'}Q(s',a')$.
+  \item This loop repeats, gradually improving the Q-values until they converge to values that represent the optimal policy or the maximum number of episodes elapse.
+\end{itemize}
+
+\subsection{Deep Q-Learning}
+Deep Q-Learning extends classical Q-learning by using a neural network to approximate the Q-function. Instead of storing a Q-table with values for every state-action pair---which becomes infeasible in large or continuous environments---DQN learns to estimate these values directly from raw state inputs.
+
+Figure \ref{fig:DQN} shows a high-level overview of the Deep-Q Learning Framework. The agent observes the environment, passes the state through a neural network, the Deep-Q Network (DQN), and receives predicted
+Q-values for each possible action. It selects an action, in this case also using an neural network, interacts
+with the environment, and updates the network using backpropagation.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\linewidth]{figure/SP25_Figures/DQN_high_level.png}
+  \caption{Deep Q-learning overview.}
+  \label{fig:DQN}
+\end{figure}
+
+\paragraph{State Representation and Initialization.}
+Again, the state $s$ in our maze problem is derived from the agent's current position and the four cells adjacent to it. Rather than mapping $s$ directly to a Q-table entry, the state is fed as input to the neural network. The DQN, defined in the \texttt{DQN} class is implemented as a multi-layer perceptron with two hidden layers. Its weights are initialized randomly, providing an unbiased starting point for Q-value estimation.
+
+\paragraph{Action Selection.}
+The agent selects actions in \texttt{act} utilizes both a neural network (or policy network) as well as the selected exploration strategy. Depending on the exploration strategy, the agent may choose to select an action at random (see Section~\ref{sec:exploration}).
+
+\paragraph{Loss Computation and Q-value Update Rule.}
+A mini-batch of past transitions $(s,a,r,s')$ is sampled from an experience replay buffer. For each transition, the target Q-value is computed as:
+\begin{equation}
+\text{Target} = r + \gamma \max_{a'} Q_{\text{target}}(s',a'),
+\end{equation}
+where $Q_{\text{target}}$ is the target network---a periodically updated copy of the policy network---to improve training stability. The loss function is defined as the mean squared error (MSE) between the predicted Q-value $Q(s,a)$ (from the policy network) and the target:
+\begin{equation}
+L = \mathrm{MSE}\Bigl(Q(s,a),\; r + \gamma \max_{a'} Q_{\text{target}}(s',a')\Bigr).
+\end{equation}
+Backpropagation is then used to update the policy network's weights to minimize this loss.
+
+\paragraph{Sample Update Step:}
+Consider an example where the agent observes state $s$, selects action $a$, receives
+reward $r$, and transitions to state $s'$. This transition is stored in the replay buffer. During training, a batch of transitions is randomly sampled. For each sample:
+\begin{itemize}
+  \item The current Q-value is obtained as $Q(s,a)$ from the policy network.
+  \item The target Q-value is computed using the target network: $r + \gamma \max_{a'} Q_{\text{target}}(s',a')$
+  \item The loss is calculated as the mean squared error between these two values.
+  \item The network weights are updated via gradient descent based on this loss.
+\end{itemize}
+
+Additionally, the target network is periodically updated by copying the weights from the policy network to
+ensure more stable learning (as implemented in the update method in DQN\_agent.py
+
+
+
+
+
+\section{Implementation}
+We provide students with starter code of both classical Q-learning and Deep Q-learning. Students are required to test and report on both methods. You'll need to carefully review the \texttt{README} provided with the code.
+
+\subsection{Maze Environment}
+We provide a maze environment where the maze is sized $N\times N$ and can be custom made by the user. In this environment, at each time step, the agent receives an observation that is a 6-element vector,
+\begin{equation}
+\mathbf{o} = [v_U, v_D, v_L, v_R, x, y],
+\end{equation}
+where $v_U, v_D, v_L, v_R$ represent the values of the cells immediately to the Up, Down, Left, and Right of the agent's current position, respectively. These cell values are binary indicators (with $0$ denoting a free cell and $1$ denoting a well or out-of-bounds condition). The final two components, $x$ and $y$, correspond to the agent's absolute coordinates within the maze.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.62\linewidth]{figure/SP25_Figures/Customize_maze.png}
+  \caption{Sample maze configuration. The red cell denotes the starting location, green is the goal, black denotes a wall (impassible), and white denotes a free square. The robot (Wall-E, customizable) denotes the agent's current location.}
+  \label{fig:Sample_maze}
+\end{figure}
+
+We also provide an implementation to train the agent’s policy for both learning algorithms. During training, the agent will execute episodes and gather reward. You will need to report on the agent’s reward per episode and how quickly an optimal policy is learned for both methods. Figure \ref{fig:Sample_maze} depicts a sample maze configuration.
+
+Additional notes:
+\begin{enumerate}
+    \item The red cell denotes the starting location, green is the goal, black denotes a wall (impassible), and white denotes a free square. The robot, Wall-E (which can be customized), denotes the agent’s current location.
+  \item At any given step the agent has an $(x,y)$ position and has 4 total possible actions: \texttt{UP}, \texttt{DOWN}, \texttt{LEFT}, \texttt{RIGHT}.
+  \item Depending on the reward setup, the agent receives a positive reward for reaching the goal and, for example, a small negative reward for each step to encourage it to find the shortest path. You will be able to try different rewards.
+  \item The maximum number of steps per episode is configurable in \texttt{config/<name\_of\_config\_file.yaml>}.
+  \item The \texttt{maze\_editor.py} allows students to customize the maze, select start/goal positions and set up walls.
+\end{enumerate}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.62\linewidth]{figure/SP25_Figures/Empty_Maze.png}
+  \caption{Empty maze that will be displayed upon running maze editor.py}
+  \label{fig:Empty_maze}
+\end{figure}
+
+\subsection{How to create a maze}
+
+Run the maze editor by executing the following command in your terminal(You can change the size if desired; for example, \texttt{--size 15} for a larger maze.)
+\begin{lstlisting}
+python maze_editor.py --size 10
+\end{lstlisting}
+
+
+When the editor starts, an empty maze grid will be displayed. The terminal will show help text with controls.
+
+
+\paragraph{Drawing and Editing the Maze}
+\begin{itemize}
+  \item \textbf{Left Click:}
+  \begin{itemize}
+    \item Click on a cell to toggle a wall.
+    \item If a cell is empty (white), clicking will turn it into a wall (black) and vice versa.
+  \end{itemize}
+  \item \textbf{Switch Drawing Modes:}
+  \begin{itemize}
+    \item Press the Space Bar to cycle between three modes:
+    \begin{itemize}
+      \item Wall Mode: For adding or removing walls.
+      \item Start Mode: For setting the starting position (displayed in red).
+      \item Goal Mode: For setting the goal position (displayed in green).
+    \end{itemize}
+    \item The current mode is displayed in the help text at the top.
+  \end{itemize}
+  \item \textbf{Mouse Drag:}
+  \begin{itemize}
+    \item Click and hold to drag the mouse across cells.
+    \item In wall mode, this allows you to quickly draw or erase walls.
+  \end{itemize}
+  \item \textbf{Additional Controls:}
+  \begin{itemize}
+    \item Clear Maze: Press \texttt{R} to reset the maze to an empty state.
+    \item Save Maze: Press \texttt{S} to save the current maze configuration to a file named \texttt{custom\_maze.txt}.
+    \item Quit: Press \texttt{Q} to exit the maze editor.
+  \end{itemize}
+\end{itemize}
+
+\paragraph{File Output.}
+When saved, the maze configuration is stored in a text file located in the \texttt{mazes} folder. The file includes the maze size on the first line, followed by a grid representing the maze layout. Listing 1 provides the corresponding maze txt file for Figure \ref{fig:Sample_maze}.
+
+\begin{figure}[H]
+  \centering
+  \hrule
+  \vspace{6pt}
+
+  \begin{minipage}{0.55\linewidth}
+\begin{lstlisting}[basicstyle=\ttfamily\small,frame=none,caption={Example of \texttt{maze\_file.txt}},captionpos=t]
+            10
+            S........#
+            .######..#
+            .#.......#
+            .#...###.#
+            .#.....#..
+            .........#
+            ###..###..
+            ..#..#....
+            ..##.#....
+            .........G
+\end{lstlisting}
+  \end{minipage}
+
+  \vspace{6pt}
+  \hrule
+  \label{Listing:Example}
+\end{figure}
+
+\subsection{Initialization}
+
+We consider two Q-value initialization strategies:
+
+\begin{itemize}
+\item \textbf{Zero initialization:} 
+All state-action values are initialized to zero, i.e., $Q(s,a)=0$.
+
+\item \textbf{Small random negative initialization:} 
+Each $Q(s,a)$ is initialized to a small random negative value 
+(e.g., sampled from a uniform distribution in a small interval below zero).
+\end{itemize}
+
+We analyze how initialization influences early exploration behavior, 
+learning speed, and convergence stability.
+
+\subsection{Rewards}
+We provide three reward designs in code:
+    \begin{itemize}
+        \item \textbf{Option A (Goal + Step penalty):}
+    \begin{itemize}
+        \item Terminal reward: $+1$ upon reaching the goal (and terminate).
+        \item Step reward: $-0.01$ for every non-terminal step.
+    \end{itemize}
+
+    \item \textbf{Option B (Goal only):}
+        \begin{itemize}
+            \item Terminal reward: $+1$ upon reaching the goal (and terminate).
+            \item Step reward: $0$ for all non-terminal steps (no penalty).
+        \end{itemize}
+
+    \item \textbf{Option C (Manhattan-shaped reward):}
+        \begin{itemize}
+            \item Let $d(s)=|x-x_g|+|y-y_g|$ denote the Manhattan distance to the goal.
+            \item Step reward: $r_t=-\eta+\beta\bigl(d(s_t)-d(s_{t+1})\bigr)$.
+            \item Terminal reward: $+1$ upon reaching the goal (and terminate).
+        \end{itemize}
+    \end{itemize}
+
+
+\subsection{Exploitation versus Exploration}
+
+To balance exploration and exploitation, we evaluate two exploration strategies:
+
+\begin{itemize}
+\item \textbf{Performance-based exploitation:} 
+The exploration rate is adjusted dynamically based on recent performance.
+
+\item \textbf{Epsilon decay Exploration:} 
+The exploration rate $\epsilon$ decreases over time, 
+encouraging exploration in early stages and exploitation later.
+\end{itemize}
+
+
+We compare how these strategies affect convergence speed, stability, 
+and final cumulative reward across both Q-learning and DQN.
+
+\subsection{Steps to Run the Project}
+\begin{enumerate}
+  \item Create a new Python environment using Miniconda (or Anaconda) or Python's built-in \texttt{venv}, and install all required packages (see \texttt{README} provided in code).
+  \item Create a custom maze using \texttt{maze\_editor.py}. The maze will be saved in the \texttt{mazes} folder.
+  \item Execute \texttt{run.py} to begin training with reinforcement learning.
+  \item Experiment with different training configurations (number of episodes, maximum steps), and change hyperparameters for each setting.
+  \item Modify the following twelve configuration files to evaluate all 
+combinations of algorithm, exploration strategy, and reward design.
+These configurations are obtained by combining:
+(i) two algorithms (tabular Q-learning and DQN),
+(ii) two exploration strategies (epsilon decay and performance-based),
+and (iii) three reward methods (goal-and-step, goal-only, and Manhattan distance shaping),
+resulting in $2 \times 2 \times 3 = 12$ settings:
+
+    \noindent
+    \textbf{Classic Q-learning:}\\
+    \texttt{q\_learning/decay/r1\_goal\_and\_step.yaml},\\
+    \texttt{q\_learning/decay/r1\_goal\_only.yaml},\\
+    \texttt{q\_learning/decay/r1\_manhattan.yaml},\\
+    \texttt{q\_learning/performance/r1\_goal\_and\_step.yaml},\\
+    \texttt{q\_learning/performance/r1\_goal\_only.yaml},\\
+    \texttt{q\_learning/performance/r1\_manhattan.yaml}.\\
+
+
+  \noindent
+    \textbf{DQN:}\\
+    \texttt{dqn/decay/r1\_goal\_and\_step.yaml},\\
+    \texttt{dqn/decay/r1\_goal\_only.yaml},\\
+    \texttt{dqn/decay/r1\_manhattan.yaml}\\
+    \texttt{dqn/performance/r1\_goal\_and\_step.yaml},\\
+    \texttt{dqn/performance/r1\_goal\_only.yaml},\\
+    \texttt{dqn/performance/r1\_manhattan.yaml}.\\[4pt]
+    
+
+    
+     Files beginning with \texttt{Q\_learning} will use classical Q-learning. Files beginning with \texttt{DQN} will use Deep Q-Learning. You should have some justification or purpose when changing hyperparameters and you will need to report on these changes.
+  \item Train the agent using both Q-learning and DQN, then evaluate performance by analyzing training metrics and visualizing saved results.
+  \begin{itemize}
+    \item Note that the starter code creates some plots to visualize the results. These are just examples on how to load the saved results. You will need to create your own plots to communicate the results of your experiments.
+  \end{itemize}
+  \item Use different initialization method (All zeros as suggested before and a random small negative number) and repeat all the above steps. So in total you will need to run 2 X 12 = 24 times.
+  \item Analyze and document your results to compare the effects of different exploration strategies and learning approaches.
+\end{enumerate}
+
+\section{Report Requirements}
+Your report must include:
+\begin{enumerate}
+  \item \textbf{Evaluation Metrics:} How are you evaluating two algorithms/learning strategies? Since most configurations will reach the optimal solution, how can we determine if one is better than another? State specifically what metric(s) you are using to compare algorithms.
+  \item \textbf{DQN vs.\ Classic Q-Learning:} Compare the performance of classic Q-learning with DQN. Discuss which performs better and under what circumstances.
+  \item \textbf{Initialization:} Evaluate the impact of different initialization strategies (all zeros or small random negative initialization) on learning dynamics, including exploration behavior, convergence rate, and final performance.
+  
+  \item \textbf{Reward Design:} Compare the impact of three reward functions on learning:
+  \begin{itemize}
+    \item \emph{Goal + step penalty:} terminal reward $+1$ at the goal, and a small negative reward for each non-terminal step (e.g., $-0.01$).
+    \item \emph{Goal only:} terminal reward $+1$ at the goal, and $0$ reward otherwise (no step penalty).
+    \item \emph{Manhattan-shaped:} a distance-based shaping term using Manhattan distance to the goal, e.g., $d(s)=|x-x_g|+|y-y_g|$ and $r_t=-\eta+\beta\bigl(d(s_t)-d(s_{t+1})\bigr)$, with terminal reward $+1$ at the goal.
+  \end{itemize}
+  Discuss how reward design influences convergence speed, stability, and final performance.
+    \item \textbf{Exploration Versus Exploitation:} Evaluate how the choice of exploration strategy --- epsilon decay or performance-based --- affects learning. Compare results across both Q-learning and DQN.
+  \item \textbf{Hyperparameter Tuning:} Experiment with key hyperparameters, and analyze how these affect learning performance.
+  \item \textbf{Visualization:} Each training session's results include visualizations of training\_metrics and trajectory\_heatmaps. Please select the images you deem important to include in the report.
+  \item \textbf{What Makes a Good Learning Algorithm?} Reflect on what makes one learning algorithm superior to another. Go beyond final performance --- consider convergence speed, stability, and generalization. Discuss these insights based on your experiments and present your best results.
+\end{enumerate}
+
+\section{Submission}
+Your submission should include:
+\begin{itemize}
+  \item Your code (it's fine if you didn't make any changes to the starter code \texttt{.py} files. Any changes should be commented. Provide any additional code you used to generate plots, compare results, etc.).
+  \item Provide all the configuration files and Maze files.
+  \item Your written report, following the requirements \& criteria listed in Section 3.
+  \item A \texttt{README} document that explains how to replicate your results, create any plots you include, or changes to the code you made.
+\end{itemize}
+
+Package all items into a single zip file named:
+\[
+\texttt{FirstName LastName ProjectNo.zip}.
+\]
+For example, \texttt{Keaton Kraiger 3.zip}. Ensure you are not using absolute paths that would only work on your computer (e.g., \texttt{/home/keaton/P3/maze\_file.txt}).  
+
+
+Make sure to properly cite all resources you used for this project and double check your submission before uploading it to the Canvas dropbox.  
+
+
+Please note that graders will read and run your code, so ensure that your code runs correctly and is well-organized and easy to understand.  
+
+\section{Grading Breakdown}
+\subsection*{Project 3 Final Report (100 points total)}
+\begin{itemize}
+  \item Evaluation metrics and reasoning for selection (10 points)
+  \item Compare DQN and Q-learning using the results (25 points)
+  \item Impact of hyperparameter on learning performance (25 points)
+  \item Compare and analyze the two initialization method, three reward methods and two exploration strategies (20 points)
+  \item Discussion on what makes one algorithm better than another (20 points)
+\end{itemize}
+
+\subsection*{Extra Credits (10 points each)}
+\begin{itemize}
+  \item Propose and implement a new exploration policy (and report on it).
+  \item Experiment by changing the rewards for each step and goal, for instance -1
+for each step and 0 for reaching the goal.
+\end{itemize}
+
+\end{document}\documentclass[12pt]{article}
+% Specifies the document class
+\newcommand{\ip}[2]{(#1, #2)}
+\usepackage{titlesec}
+\usepackage{longtable}
+\usepackage[colorlinks]{hyperref}
+\usepackage{graphicx}  
+\usepackage{listings}
+\usepackage{subfigure,fullpage}
+\titleformat*{\section}{\Large\bfseries}
+\titleformat*{\subsection}{\normalsize\bfseries}
+\usepackage{amsmath}
+\usepackage{setspace}
+\usepackage{float}
+\usepackage{caption}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    filecolor=black,
+    urlcolor=black,
+    citecolor=black
+}
+
+\begin{document}        
+% End of preamble and beginning of text.
+\begin{spacing}{2}
+\begin{center}
+\textbf{\Large{Project \#3:} Reinforcement Learning: \\
+Robot in a MAZE}\\
+CSE583/EE552 Pattern Recognition and Machine Learning, Spring 2026\\
+
+Release Date: Tuesday, March 3, 2026\\
+Final Due Date: Friday, March 20, 2026
+\end{center}
+\end{spacing}
+\begin{center}
+% Final 
+Professor: Yanxi Liu (yul11@psu.edu)\\
+LA: Jiapeng Yu jfy5396@psu.edu\\
+TA: Keaton Kraiger kbk5531@psu.edu\\
+\end{center}
+
+\tableofcontents
+% Break until the next page
+\vfill
+\pagebreak
+
+
+\section{Introduction}
+
+This project studies reinforcement learning in the context of a maze navigation task. 
+The objective is to design an agent that learns a {\em policy} to reach a desired goal location
+using {\bf\em Q-learning}. %through interaction with the environment. 
+We implement both the Classic tabular Q-learning and Deep Q-Network (DQN) approaches to compare their learning behavior and performance.
+
+\subsection{Reinforcement Learning Framework}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\linewidth]{figure/SP26_Figures/Project3_fig1.png}
+  \caption{High-level illustration of the agent-environment interaction loop in reinforcement learning, where the agent observes, acts, and receives rewards from the environment.}
+  \label{fig:High_level}
+\end{figure}
+
+In the RL framework, an agent is the decision-maker or learner. The agent interacts with the environment by taking actions based on its current knowledge. A state represents the environment at a given time, and the agent uses this information to decide the next action. An action is a choice made by the agent that affects the environment's state. Actions are selected based on a policy, which is refined over time. Figure \ref{fig:High_level} provides a high-level illustration of the agent-environment interaction in reinforcement learning.
+
+\begin{itemize}
+
+  \item \textbf{Environment (Right):} Depicted as the Earth, the environment is everything external to the agent. It receives the agent's actions and, in response, transitions to a new state and produces rewards.
+  
+  \begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\linewidth]{figure/SP26_Figures/Environment_MDP.png}
+  \caption{Environment is modeled as a Markov Decision Process containing states, actions, transition probability, reward function and discount factor.}
+  \label{fig:Env_MDP}
+\end{figure}
+
+  \item \textbf{Agent (Left):} The stylized robot represents the learning agent. It has a goal or objective in mind, indicating what it aims to achieve.
+  \item \textbf{Policy:} The policy is the angent's behavior rule, it defines how actions are selected given states. The policy is the central object in RL
+  
+  \item{\textbf{Reward:}} After the environment executes an action, it returns a scalar reward signal that provides feedback on the agent's behavior and guides policy learning.
+
+  \item{\textbf{Value:}} is show how promising is this situation. it predicts long-term goodness. While reward is immediate, value looks into the future. 
+\end{itemize}
+
+\subsection{Exploration Versus Exploitation}
+In reinforcement learning, exploration and exploitation are two fundamental strategies that an agent must balance when learning to make decisions:
+\begin{itemize}
+  \item \textbf{Exploration:} The agent tries out new actions and visits less familiar states to gather information about the environment.
+  \item \textbf{Exploitation:} The agent leverages the knowledge it has already acquired by choosing actions that have historically led to high rewards.
+\end{itemize}
+
+Since reinforcement learning involves learning through trial and error, the agent must balance two competing goals: exploration (trying new actions) and exploitation (choosing the best-known actions). The starter code provides several exploration strategies, which you can configure using the \texttt{epsilon\_policy} argument.
+
+\paragraph{Epsilon Decay Strategy:}The agent starts with a high exploration rate $\epsilon$, encouraging it to take random actions and explore the environment. Over time, $\epsilon$ decays toward a minimum value:
+\begin{equation}
+\epsilon_t = \epsilon_{\min} + (\epsilon_{\max} - \epsilon_{\min}) \cdot \exp(-\text{decay\_rate}\cdot t).
+\end{equation}
+
+\paragraph{Performance-Based (Exploitation) Strategy.}
+In this approach, the exploration rate $\epsilon$ is adjusted based on the agent's recent performance. If the agent shows improvement (e.g., recent average rewards higher than earlier ones), then $\epsilon$ is reduced; otherwise, the agent continues to explore.
+
+\subsection{The Bellman Equation}
+A cornerstone of Reinforcement Learning is the Bellman equation, which expresses how the current estimate for state-action value $Q(s,a)$ relates to immediate rewards and future returns. In Q-learning, we approximate it via the update rule:
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\linewidth]{figure/SP25_Figures/bellman.png}
+
+\end{figure}
+
+Where:
+\begin{itemize}
+  \item $Q(s,a)$ is our current estimate of the action-value function,
+  \item $\alpha$ controls how quickly we incorporate new information,
+  \item $R(s,a)$ is the immediate reward,
+  \item $\gamma$ is the discount factor for future rewards,
+  \item $\max_{a'} Q(s',a')$ is the highest estimated value of the next state,
+  \item $Q_{\text{new}}(s,a)$ is the updated estimate.
+\end{itemize}
+
+\subsection{Classic Q-Learning}
+Q-learning is a classical, model-free method for reinforcement learning. In the context of our maze navigation problem, the Q-learning agent maintains a table, known as the Q-table, where each entry $Q(s,a)$ represents the expected cumulative reward of taking action $a$ in state $s$, and then following an optimal policy thereafter. Figure \ref{fig:Q-learning} provides an overview of the Q-learning approach.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\linewidth]{figure/SP25_Figures/high_level_q_learning.png}
+  \caption{Classic Q-learning overview.}
+  \label{fig:Q-learning}
+\end{figure}
+
+\paragraph{State Representation and Initialization.}
+
+The state $s$ represents the agent’s current configuration in the environment, which fully describes its situation for decision-making. In the maze setting, the state is defined by the agent’s grid position and encoded as the tuple $(x,y)$. 
+Initially, the Q-table is initialized with zeros for all state--action pairs, indicating no prior preference before learning from interaction.
+
+
+\textbf{Action Selection.} 
+The agent balances \emph{exploration versus exploitation} using an $\epsilon$-greedy strategy. 
+With probability $\epsilon$, it explores by selecting a random action, while with probability $1-\epsilon$, it exploits current knowledge by choosing the action with the highest Q-value in the current state.
+
+\paragraph{Q-value Update Rule.}
+When the agent takes an action $a$ in state $s$, receives a reward $r$, and transitions to a new state $s'$, the Q-value is updated using:
+\begin{equation}
+Q(s,a) \leftarrow Q(s,a) + \alpha\left( r + \gamma \max_{a'} Q(s',a') - Q(s,a) \right).
+\end{equation}
+
+
+Here:
+\begin{itemize}
+  \item $\alpha$ is the learning rate, which determines how much new experiences influence the Q-values.
+  \item $\gamma$ is the discount factor, weighting future rewards.
+  \item The environment returns a reward $r$ and a new state $s'$ after the action is executed.
+  \item The term $\max_{a'}Q(s',a')$ represents the estimated maximum future reward achievable from state $s'$. $Q(s,a)$ based on the observed reward and the maximum estimated value of the next state: $\max_{a'}Q(s',a')$.
+\end{itemize}
+
+
+This update is applied only to the Q-value corresponding to the state-action pair $(s,a)$; all other Q-values
+remain unchanged at that step.
+
+\paragraph{Loop summary:}
+Suppose the agent is in state s at coordinates $(x,y)$, take action $a$, receives reward $r$, and transitions to state $s'$. The update modifies only $Q(s,a)$ based on the observed outcome, while the Q-values for all other actions and states remain unchanged. This targeted update gradually shapes the Q-table, improving the agent’s policy over time.
+The Q-table stores a value $Q(s,a)$ ) for each state $s$ and action $a$. At each step:
+\begin{itemize}
+  \item The agent observes the current state $s$.
+  \item It selects an action $a$, typically using an exploration strategy (e.g., $\epsilon$-greedy).
+  \item The environment returns a reward $r$ and a new state $s'$ after the action is executed.
+  \item The agent updates $Q(s,a)$ based on the observed reward and the maximum estimated value of the next state: $\max_{a'}Q(s',a')$.
+  \item This loop repeats, gradually improving the Q-values until they converge to values that represent the optimal policy or the maximum number of episodes elapse.
+\end{itemize}
+
+\subsection{Deep Q-Learning}
+Deep Q-Learning extends classical Q-learning by using a neural network to approximate the Q-function. Instead of storing a Q-table with values for every state-action pair---which becomes infeasible in large or continuous environments---DQN learns to estimate these values directly from raw state inputs.
+
+Figure \ref{fig:DQN} shows a high-level overview of the Deep-Q Learning Framework. The agent observes the environment, passes the state through a neural network, the Deep-Q Network (DQN), and receives predicted
+Q-values for each possible action. It selects an action, in this case also using an neural network, interacts
+with the environment, and updates the network using backpropagation.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\linewidth]{figure/SP25_Figures/DQN_high_level.png}
+  \caption{Deep Q-learning overview.}
+  \label{fig:DQN}
+\end{figure}
+
+\paragraph{State Representation and Initialization.}
+Again, the state $s$ in our maze problem is derived from the agent's current position and the four cells adjacent to it. Rather than mapping $s$ directly to a Q-table entry, the state is fed as input to the neural network. The DQN, defined in the \texttt{DQN} class is implemented as a multi-layer perceptron with two hidden layers. Its weights are initialized randomly, providing an unbiased starting point for Q-value estimation.
+
+\paragraph{Action Selection.}
+The agent selects actions in \texttt{act} utilizes both a neural network (or policy network) as well as the selected exploration strategy. Depending on the exploration strategy, the agent may choose to select an action at random (see Section~\ref{sec:exploration}).
+
+\paragraph{Loss Computation and Q-value Update Rule.}
+A mini-batch of past transitions $(s,a,r,s')$ is sampled from an experience replay buffer. For each transition, the target Q-value is computed as:
+\begin{equation}
+\text{Target} = r + \gamma \max_{a'} Q_{\text{target}}(s',a'),
+\end{equation}
+where $Q_{\text{target}}$ is the target network---a periodically updated copy of the policy network---to improve training stability. The loss function is defined as the mean squared error (MSE) between the predicted Q-value $Q(s,a)$ (from the policy network) and the target:
+\begin{equation}
+L = \mathrm{MSE}\Bigl(Q(s,a),\; r + \gamma \max_{a'} Q_{\text{target}}(s',a')\Bigr).
+\end{equation}
+Backpropagation is then used to update the policy network's weights to minimize this loss.
+
+\paragraph{Sample Update Step:}
+Consider an example where the agent observes state $s$, selects action $a$, receives
+reward $r$, and transitions to state $s'$. This transition is stored in the replay buffer. During training, a batch of transitions is randomly sampled. For each sample:
+\begin{itemize}
+  \item The current Q-value is obtained as $Q(s,a)$ from the policy network.
+  \item The target Q-value is computed using the target network: $r + \gamma \max_{a'} Q_{\text{target}}(s',a')$
+  \item The loss is calculated as the mean squared error between these two values.
+  \item The network weights are updated via gradient descent based on this loss.
+\end{itemize}
+
+Additionally, the target network is periodically updated by copying the weights from the policy network to
+ensure more stable learning (as implemented in the update method in DQN\_agent.py
+
+
+
+
+
+\section{Implementation}
+We provide students with starter code of both classical Q-learning and Deep Q-learning. Students are required to test and report on both methods. You'll need to carefully review the \texttt{README} provided with the code.
+
+\subsection{Maze Environment}
+We provide a maze environment where the maze is sized $N\times N$ and can be custom made by the user. In this environment, at each time step, the agent receives an observation that is a 6-element vector,
+\begin{equation}
+\mathbf{o} = [v_U, v_D, v_L, v_R, x, y],
+\end{equation}
+where $v_U, v_D, v_L, v_R$ represent the values of the cells immediately to the Up, Down, Left, and Right of the agent's current position, respectively. These cell values are binary indicators (with $0$ denoting a free cell and $1$ denoting a well or out-of-bounds condition). The final two components, $x$ and $y$, correspond to the agent's absolute coordinates within the maze.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.62\linewidth]{figure/SP25_Figures/Customize_maze.png}
+  \caption{Sample maze configuration. The red cell denotes the starting location, green is the goal, black denotes a wall (impassible), and white denotes a free square. The robot (Wall-E, customizable) denotes the agent's current location.}
+  \label{fig:Sample_maze}
+\end{figure}
+
+We also provide an implementation to train the agent’s policy for both learning algorithms. During training, the agent will execute episodes and gather reward. You will need to report on the agent’s reward per episode and how quickly an optimal policy is learned for both methods. Figure \ref{fig:Sample_maze} depicts a sample maze configuration.
+
+Additional notes:
+\begin{enumerate}
+    \item The red cell denotes the starting location, green is the goal, black denotes a wall (impassible), and white denotes a free square. The robot, Wall-E (which can be customized), denotes the agent’s current location.
+  \item At any given step the agent has an $(x,y)$ position and has 4 total possible actions: \texttt{UP}, \texttt{DOWN}, \texttt{LEFT}, \texttt{RIGHT}.
+  \item Depending on the reward setup, the agent receives a positive reward for reaching the goal and, for example, a small negative reward for each step to encourage it to find the shortest path. You will be able to try different rewards.
+  \item The maximum number of steps per episode is configurable in \texttt{config/<name\_of\_config\_file.yaml>}.
+  \item The \texttt{maze\_editor.py} allows students to customize the maze, select start/goal positions and set up walls.
+\end{enumerate}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.62\linewidth]{figure/SP25_Figures/Empty_Maze.png}
+  \caption{Empty maze that will be displayed upon running maze editor.py}
+  \label{fig:Empty_maze}
+\end{figure}
+
+\subsection{How to create a maze}
+
+Run the maze editor by executing the following command in your terminal(You can change the size if desired; for example, \texttt{--size 15} for a larger maze.)
+\begin{lstlisting}
+python maze_editor.py --size 10
+\end{lstlisting}
+
+
+When the editor starts, an empty maze grid will be displayed. The terminal will show help text with controls.
+
+
+\paragraph{Drawing and Editing the Maze}
+\begin{itemize}
+  \item \textbf{Left Click:}
+  \begin{itemize}
+    \item Click on a cell to toggle a wall.
+    \item If a cell is empty (white), clicking will turn it into a wall (black) and vice versa.
+  \end{itemize}
+  \item \textbf{Switch Drawing Modes:}
+  \begin{itemize}
+    \item Press the Space Bar to cycle between three modes:
+    \begin{itemize}
+      \item Wall Mode: For adding or removing walls.
+      \item Start Mode: For setting the starting position (displayed in red).
+      \item Goal Mode: For setting the goal position (displayed in green).
+    \end{itemize}
+    \item The current mode is displayed in the help text at the top.
+  \end{itemize}
+  \item \textbf{Mouse Drag:}
+  \begin{itemize}
+    \item Click and hold to drag the mouse across cells.
+    \item In wall mode, this allows you to quickly draw or erase walls.
+  \end{itemize}
+  \item \textbf{Additional Controls:}
+  \begin{itemize}
+    \item Clear Maze: Press \texttt{R} to reset the maze to an empty state.
+    \item Save Maze: Press \texttt{S} to save the current maze configuration to a file named \texttt{custom\_maze.txt}.
+    \item Quit: Press \texttt{Q} to exit the maze editor.
+  \end{itemize}
+\end{itemize}
+
+\paragraph{File Output.}
+When saved, the maze configuration is stored in a text file located in the \texttt{mazes} folder. The file includes the maze size on the first line, followed by a grid representing the maze layout. Listing 1 provides the corresponding maze txt file for Figure \ref{fig:Sample_maze}.
+
+\begin{figure}[H]
+  \centering
+  \hrule
+  \vspace{6pt}
+
+  \begin{minipage}{0.55\linewidth}
+\begin{lstlisting}[basicstyle=\ttfamily\small,frame=none,caption={Example of \texttt{maze\_file.txt}},captionpos=t]
+            10
+            S........#
+            .######..#
+            .#.......#
+            .#...###.#
+            .#.....#..
+            .........#
+            ###..###..
+            ..#..#....
+            ..##.#....
+            .........G
+\end{lstlisting}
+  \end{minipage}
+
+  \vspace{6pt}
+  \hrule
+  \label{Listing:Example}
+\end{figure}
+
+\subsection{Initialization}
+
+We consider two Q-value initialization strategies:
+
+\begin{itemize}
+\item \textbf{Zero initialization:} 
+All state-action values are initialized to zero, i.e., $Q(s,a)=0$.
+
+\item \textbf{Small random negative initialization:} 
+Each $Q(s,a)$ is initialized to a small random negative value 
+(e.g., sampled from a uniform distribution in a small interval below zero).
+\end{itemize}
+
+We analyze how initialization influences early exploration behavior, 
+learning speed, and convergence stability.
+
+\subsection{Rewards}
+We provide three reward designs in code:
+    \begin{itemize}
+        \item \textbf{Option A (Goal + Step penalty):}
+    \begin{itemize}
+        \item Terminal reward: $+1$ upon reaching the goal (and terminate).
+        \item Step reward: $-0.01$ for every non-terminal step.
+    \end{itemize}
+
+    \item \textbf{Option B (Goal only):}
+        \begin{itemize}
+            \item Terminal reward: $+1$ upon reaching the goal (and terminate).
+            \item Step reward: $0$ for all non-terminal steps (no penalty).
+        \end{itemize}
+
+    \item \textbf{Option C (Manhattan-shaped reward):}
+        \begin{itemize}
+            \item Let $d(s)=|x-x_g|+|y-y_g|$ denote the Manhattan distance to the goal.
+            \item Step reward: $r_t=-\eta+\beta\bigl(d(s_t)-d(s_{t+1})\bigr)$.
+            \item Terminal reward: $+1$ upon reaching the goal (and terminate).
+        \end{itemize}
+    \end{itemize}
+
+
+\subsection{Exploitation versus Exploration}
+
+To balance exploration and exploitation, we evaluate two exploration strategies:
+
+\begin{itemize}
+\item \textbf{Performance-based exploitation:} 
+The exploration rate is adjusted dynamically based on recent performance.
+
+\item \textbf{Epsilon decay Exploration:} 
+The exploration rate $\epsilon$ decreases over time, 
+encouraging exploration in early stages and exploitation later.
+\end{itemize}
+
+
+We compare how these strategies affect convergence speed, stability, 
+and final cumulative reward across both Q-learning and DQN.
+
+\subsection{Steps to Run the Project}
+\begin{enumerate}
+  \item Create a new Python environment using Miniconda (or Anaconda) or Python's built-in \texttt{venv}, and install all required packages (see \texttt{README} provided in code).
+  \item Create a custom maze using \texttt{maze\_editor.py}. The maze will be saved in the \texttt{mazes} folder.
+  \item Execute \texttt{run.py} to begin training with reinforcement learning.
+  \item Experiment with different training configurations (number of episodes, maximum steps), and change hyperparameters for each setting.
+  \item Modify the following twelve configuration files to evaluate all 
+combinations of algorithm, exploration strategy, and reward design.
+These configurations are obtained by combining:
+(i) two algorithms (tabular Q-learning and DQN),
+(ii) two exploration strategies (epsilon decay and performance-based),
+and (iii) three reward methods (goal-and-step, goal-only, and Manhattan distance shaping),
+resulting in $2 \times 2 \times 3 = 12$ settings:
+
+    \noindent
+    \textbf{Classic Q-learning:}\\
+    \texttt{q\_learning/decay/r1\_goal\_and\_step.yaml},\\
+    \texttt{q\_learning/decay/r1\_goal\_only.yaml},\\
+    \texttt{q\_learning/decay/r1\_manhattan.yaml},\\
+    \texttt{q\_learning/performance/r1\_goal\_and\_step.yaml},\\
+    \texttt{q\_learning/performance/r1\_goal\_only.yaml},\\
+    \texttt{q\_learning/performance/r1\_manhattan.yaml}.\\
+
+
+  \noindent
+    \textbf{DQN:}\\
+    \texttt{dqn/decay/r1\_goal\_and\_step.yaml},\\
+    \texttt{dqn/decay/r1\_goal\_only.yaml},\\
+    \texttt{dqn/decay/r1\_manhattan.yaml}\\
+    \texttt{dqn/performance/r1\_goal\_and\_step.yaml},\\
+    \texttt{dqn/performance/r1\_goal\_only.yaml},\\
+    \texttt{dqn/performance/r1\_manhattan.yaml}.\\[4pt]
+    
+
+    
+     Files beginning with \texttt{Q\_learning} will use classical Q-learning. Files beginning with \texttt{DQN} will use Deep Q-Learning. You should have some justification or purpose when changing hyperparameters and you will need to report on these changes.
+  \item Train the agent using both Q-learning and DQN, then evaluate performance by analyzing training metrics and visualizing saved results.
+  \begin{itemize}
+    \item Note that the starter code creates some plots to visualize the results. These are just examples on how to load the saved results. You will need to create your own plots to communicate the results of your experiments.
+  \end{itemize}
+  \item Use different initialization method (All zeros as suggested before and a random small negative number) and repeat all the above steps. So in total you will need to run 2 X 12 = 24 times.
+  \item Analyze and document your results to compare the effects of different exploration strategies and learning approaches.
+\end{enumerate}
+
+\section{Report Requirements}
+Your report must include:
+\begin{enumerate}
+  \item \textbf{Evaluation Metrics:} How are you evaluating two algorithms/learning strategies? Since most configurations will reach the optimal solution, how can we determine if one is better than another? State specifically what metric(s) you are using to compare algorithms.
+  \item \textbf{DQN vs.\ Classic Q-Learning:} Compare the performance of classic Q-learning with DQN. Discuss which performs better and under what circumstances.
+  \item \textbf{Initialization:} Evaluate the impact of different initialization strategies (all zeros or small random negative initialization) on learning dynamics, including exploration behavior, convergence rate, and final performance.
+  
+  \item \textbf{Reward Design:} Compare the impact of three reward functions on learning:
+  \begin{itemize}
+    \item \emph{Goal + step penalty:} terminal reward $+1$ at the goal, and a small negative reward for each non-terminal step (e.g., $-0.01$).
+    \item \emph{Goal only:} terminal reward $+1$ at the goal, and $0$ reward otherwise (no step penalty).
+    \item \emph{Manhattan-shaped:} a distance-based shaping term using Manhattan distance to the goal, e.g., $d(s)=|x-x_g|+|y-y_g|$ and $r_t=-\eta+\beta\bigl(d(s_t)-d(s_{t+1})\bigr)$, with terminal reward $+1$ at the goal.
+  \end{itemize}
+  Discuss how reward design influences convergence speed, stability, and final performance.
+    \item \textbf{Exploration Versus Exploitation:} Evaluate how the choice of exploration strategy --- epsilon decay or performance-based --- affects learning. Compare results across both Q-learning and DQN.
+  \item \textbf{Hyperparameter Tuning:} Experiment with key hyperparameters, and analyze how these affect learning performance.
+  \item \textbf{Visualization:} Each training session's results include visualizations of training\_metrics and trajectory\_heatmaps. Please select the images you deem important to include in the report.
+  \item \textbf{What Makes a Good Learning Algorithm?} Reflect on what makes one learning algorithm superior to another. Go beyond final performance --- consider convergence speed, stability, and generalization. Discuss these insights based on your experiments and present your best results.
+\end{enumerate}
+
+\section{Submission}
+Your submission should include:
+\begin{itemize}
+  \item Your code (it's fine if you didn't make any changes to the starter code \texttt{.py} files. Any changes should be commented. Provide any additional code you used to generate plots, compare results, etc.).
+  \item Provide all the configuration files and Maze files.
+  \item Your written report, following the requirements \& criteria listed in Section 3.
+  \item A \texttt{README} document that explains how to replicate your results, create any plots you include, or changes to the code you made.
+\end{itemize}
+
+Package all items into a single zip file named:
+\[
+\texttt{FirstName LastName ProjectNo.zip}.
+\]
+For example, \texttt{Keaton Kraiger 3.zip}. Ensure you are not using absolute paths that would only work on your computer (e.g., \texttt{/home/keaton/P3/maze\_file.txt}).  
+
+
+Make sure to properly cite all resources you used for this project and double check your submission before uploading it to the Canvas dropbox.  
+
+
+Please note that graders will read and run your code, so ensure that your code runs correctly and is well-organized and easy to understand.  
+
+\section{Grading Breakdown}
+\subsection*{Project 3 Final Report (100 points total)}
+\begin{itemize}
+  \item Evaluation metrics and reasoning for selection (10 points)
+  \item Compare DQN and Q-learning using the results (25 points)
+  \item Impact of hyperparameter on learning performance (25 points)
+  \item Compare and analyze the two initialization method, three reward methods and two exploration strategies (20 points)
+  \item Discussion on what makes one algorithm better than another (20 points)
+\end{itemize}
+
+\subsection*{Extra Credits (10 points each)}
+\begin{itemize}
+  \item Propose and implement a new exploration policy (and report on it).
+  \item Experiment by changing the rewards for each step and goal, for instance -1
+for each step and 0 for reaching the goal.
+\end{itemize}
+
+We provide a maze environment where the maze is sized $N\times N$ and can be custom made by the user. In this environment, at each time step, the agent receives a fully observable state vector:
+\begin{equation}
+\mathbf{o} = [\mathrm{vec}(M), x_a, y_a, x_s, y_s, x_g, y_g],
+\end{equation}
+where $\mathrm{vec}(M)$ is the flattened $N\times N$ maze map (free/wall encoding), $(x_a,y_a)$ is the current agent position, $(x_s,y_s)$ is the start position, and $(x_g,y_g)$ is the goal position. Therefore, the observation dimension is $N^2 + 6$.
+
+
+\end{document}

@@ -1,0 +1,39 @@
+agent: "Q-learning"  # Agent type selector in run.py ("Q-learning" uses tabular Q-values).
+maze_file: "mazes/10x10.txt"  # Maze layout file (S=start, G=goal, #=wall).
+
+reward:
+  mode: "manhattan"  # Reward function: r=-eta + beta*(d_prev-d_curr), terminal -> goal_reward.
+  goal_reward: 1.0  # Reward returned when agent reaches goal (done=True).
+  eta: 0.01  # Per-step base penalty term used only in manhattan mode.
+  beta: 0.1  # Distance-improvement weight used only in manhattan mode.
+
+hyperparameters:
+  learning_rate: 0.10  # Alpha learning rate for tabular Q-learning updates.
+  discount_rate: 0.99  # Gamma discount factor for future rewards.
+  q_init_strategy: "random_negative"  # Q-table init strategy ("zero" or "random_negative").
+  q_init_random_low: -0.5  # Lower bound for random_negative Q initialization.
+  q_init_random_high: 0.0  # Upper bound for random_negative Q initialization.
+  epsilon_policy: "decay"  # Epsilon schedule policy.
+  epsilon: 1.0  # Initial epsilon (exploration probability).
+  epsilon_min: 0.05  # Floor for epsilon after decay.
+  epsilon_decay: 0.995  # Multiplicative decay factor applied per episode.
+
+training:
+  episodes: 800  # Number of training episodes.
+  max_steps: 200  # Per-episode step cap during training.
+  render: True  # Live render training environment.
+  render_heatmap: True  # Overlay visit heatmap when training render is enabled.
+
+evaluation:
+  enabled: True  # Run periodic evaluation during training.
+  num_videos: 5  # Number of periodic eval checkpoints to record.
+  episodes: 1  # Eval episodes per checkpoint.
+  max_steps: 50  # Step cap per eval episode.
+  save_video: True  # Persist eval rollouts to video/files.
+  video_heatmap: True  # Overlay visitation heatmap on saved eval videos.
+  display: True  # Show evaluation window while running.
+  fps: 8  # Output frame rate for saved videos.
+
+viz:
+  num_plots: 4  # Number of trajectory episodes to visualize post-training.
+  window_size: null  # Smoothing window; null = auto-select based on episode count.
