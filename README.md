@@ -168,3 +168,44 @@ python run.py --config configs/q_learning/decay/random_negative/r1_goal_and_step
 ```bash
 python run.py --config configs/q_learning/decay/random_negative/r1_goal_and_step.yaml --no-eval-display
 ```
+
+## Quick Replication
+Setup venv
+
+```
+python3 -m venv .venv
+source .venv/bin/activate  
+```
+
+Have written Shell scripts for ZSH to automate the collection of all configs' results
+
+For Baseline
+```
+chmod +x run-script.zsh 
+./run-script.zsh
+```
+
+For Hyper-parameter Tuning:
+```
+chmod +x hyperparam_sweep/run-sweep.zsh
+./hyperparam_sweep/run-sweep.zsh
+```
+
+If you don't have ZSH you will have to manually run all sequences in the form 
+
+```bash
+python run.py --config <config-file-path>
+```
+
+For creating the global visualizations 
+
+```
+python additional-visualizations.py
+```
+
+For Hyperparameter Visualization
+
+```
+python visualize_hyperparam_results.py
+```
+
