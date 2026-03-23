@@ -53,11 +53,12 @@ def _init_dir_name(q_init_strategy):
 def build_save_base_dir(config):
     hp = config.get('hyperparameters', {})
     reward_cfg = config.get('reward', {})
+    results_root = config.get('results_dir', 'results')
     algo_dir = _algo_dir_name(config.get('agent', 'unknown'))
     init_dir = _init_dir_name(hp.get('q_init_strategy', 'zero'))
     policy_dir = _sanitize_name(hp.get('epsilon_policy', 'unknown_policy'))
     reward_dir = _sanitize_name(reward_cfg.get('mode', 'unknown_reward'))
-    return os.path.join("results", algo_dir, init_dir, policy_dir, reward_dir)
+    return os.path.join(results_root, algo_dir, init_dir, policy_dir, reward_dir)
 
 def build_next_run_dir(save_base_dir, maze_file):
     maze_name = os.path.splitext(os.path.basename(str(maze_file)))[0] or "maze"
@@ -492,11 +493,14 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, required=True, help='Path to experiment YAML config')
+    parser.add_argument('--results-dir', type=str, default='results',
+                        help='Directory for saving results (default: results)')
     parser.add_argument('--no-eval-display', action='store_true',
                         help='Disable periodic evaluation display window while still allowing video saving.')
     args = parser.parse_args()
 
     config = load_experiment_config(args.config)
+    config['results_dir'] = args.results_dir
     save_dir, agent, env, train_timing = train(config, no_eval_display=args.no_eval_display)
     print(f"\nExperiment completed. Results saved to: {save_dir}")
 

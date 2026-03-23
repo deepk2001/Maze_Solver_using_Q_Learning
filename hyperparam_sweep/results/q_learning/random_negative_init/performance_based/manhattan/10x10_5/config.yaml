@@ -1,0 +1,35 @@
+agent: Q-learning
+evaluation:
+  display: false
+  enabled: true
+  episodes: 1
+  fps: 8
+  max_steps: 50
+  num_videos: 5
+  save_video: true
+  video_heatmap: true
+hyperparameters:
+  discount_rate: 0.999
+  epsilon: 1.0
+  epsilon_decay: 0.99
+  epsilon_min: 0.05
+  epsilon_policy: performance_based
+  learning_rate: 0.1
+  q_init_random_high: 0.0
+  q_init_random_low: -0.5
+  q_init_strategy: random_negative
+maze_file: mazes/10x10.txt
+results_dir: hyperparam_sweep/results
+reward:
+  beta: 0.1
+  eta: 0.01
+  goal_reward: 1.0
+  mode: manhattan
+training:
+  episodes: 800
+  max_steps: 200
+  render: false
+  render_heatmap: false
+viz:
+  num_plots: 4
+  window_size: null
