@@ -1,6 +1,6 @@
 """
-Visualize hyperparameter sweep results from hyperparameter_results/ folder.
-Grid: 3 learning rates × 3 discount rates for Q-learning (random_negative, performance_based, manhattan).
+Visualize hyperparameter sweep results using Steps per Episode (convergence rate).
+Grid: learning rates × discount rates. Lower steps = better.
 """
 
 import os
@@ -22,39 +22,39 @@ OUTPUT_DIR = "hyperparameter_visualizations"
 
 
 def load_hyperparam_data(results_root=RESULTS_ROOT):
-    """Load all runs from hyperparameter_results, extracting lr/gamma from config."""
+    """Load all runs, extracting lr/gamma from config. Requires episode_steps for curves."""
     data = []
     for root, _, files in os.walk(results_root):
-        if "summary.npy" in files and "rewards.npy" in files and "config.yaml" in files:
-            try:
-                config_path = os.path.join(root, "config.yaml")
-                with open(config_path, "r") as f:
-                    config = yaml.safe_load(f)
-                hp = config.get("hyperparameters", {})
-                lr = hp.get("learning_rate")
-                gamma = hp.get("discount_rate")
-                if lr is None or gamma is None:
-                    continue
+        if "summary.npy" not in files:
+            continue
+        if "config.yaml" not in files:
+            continue
+        try:
+            config_path = os.path.join(root, "config.yaml")
+            with open(config_path, "r") as f:
+                config = yaml.safe_load(f)
+            hp = config.get("hyperparameters", {})
+            lr = hp.get("learning_rate")
+            gamma = hp.get("discount_rate")
+            if lr is None or gamma is None:
+                continue
 
-                rewards = np.load(os.path.join(root, "rewards.npy"))
-                summary = np.load(
-                    os.path.join(root, "summary.npy"), allow_pickle=True
-                ).item()
-
-                data.append({
-                    "path": root,
-                    "learning_rate": lr,
-                    "discount_rate": gamma,
-                    "rewards": rewards,
-                    "final_avg": summary.get("avg_reward", 0),
-                    "std_reward": summary.get("std_reward", 0),
-                    "max_reward": summary.get("max_reward", 0),
-                    "avg_steps": summary.get("avg_episode_steps", 0),
-                    "total_time": summary.get("total_time", 0),
-                    "label": f"lr={lr} γ={gamma}",
-                })
-            except Exception as e:
-                print(f"Skipping {root}: {e}")
+            summary = np.load(os.path.join(root, "summary.npy"), allow_pickle=True).item()
+            entry = {
+                "path": root,
+                "learning_rate": lr,
+                "discount_rate": gamma,
+                "avg_steps": summary.get("avg_episode_steps", np.nan),
+                "total_time": summary.get("total_time", 0),
+                "label": f"lr={lr} γ={gamma}",
+            }
+            if "episode_steps.npy" in files:
+                entry["steps"] = np.load(os.path.join(root, "episode_steps.npy"))
+            else:
+                entry["steps"] = None
+            data.append(entry)
+        except Exception as e:
+            print(f"Skipping {root}: {e}")
     return data
 
 
@@ -69,20 +69,28 @@ def _smooth(arr, window=None):
 
 
 def plot_heatmap(data):
-    """Heatmap: rows=learning_rate, cols=discount_rate."""
+    """Heatmap: LR × γ, avg steps. Lower = better (green)."""
     lrs = sorted(set(d["learning_rate"] for d in data))
     gammas = sorted(set(d["discount_rate"] for d in data))
     matrix = np.full((len(lrs), len(gammas)), np.nan)
 
     for d in data:
+        if not np.isfinite(d["avg_steps"]):
+            continue
         i = lrs.index(d["learning_rate"])
         j = gammas.index(d["discount_rate"])
-        matrix[i, j] = d["final_avg"]
+        v = d["avg_steps"]
+        if np.isnan(matrix[i, j]) or v < matrix[i, j]:
+            matrix[i, j] = v
+
+    if not np.any(np.isfinite(matrix)):
+        print("No steps data for heatmap.")
+        return
 
     fig, ax = plt.subplots(figsize=(7, 5))
-    vmin = np.nanmin(matrix) if np.any(~np.isnan(matrix)) else -2
-    vmax = np.nanmax(matrix) if np.any(~np.isnan(matrix)) else 3
-    im = ax.imshow(matrix, cmap="RdYlGn", aspect="auto", vmin=vmin, vmax=vmax)
+    valid = matrix[np.isfinite(matrix)]
+    vmin, vmax = np.min(valid), np.max(valid)
+    im = ax.imshow(matrix, cmap="RdYlGn_r", aspect="auto", vmin=vmin, vmax=vmax)
 
     ax.set_xticks(np.arange(len(gammas)))
     ax.set_yticks(np.arange(len(lrs)))
@@ -94,11 +102,11 @@ def plot_heatmap(data):
     for i in range(len(lrs)):
         for j in range(len(gammas)):
             val = matrix[i, j]
-            text = f"{val:.2f}" if not np.isnan(val) else "-"
+            text = f"{val:.1f}" if np.isfinite(val) else "-"
             ax.text(j, i, text, ha="center", va="center", fontsize=11)
 
-    ax.set_title("Average Reward: Learning Rate × Discount Rate")
-    plt.colorbar(im, ax=ax, label="Avg Reward")
+    ax.set_title("Avg Steps per Episode: LR × γ (Lower = Better)")
+    plt.colorbar(im, ax=ax, label="Avg Steps")
     plt.tight_layout()
     out = os.path.join(OUTPUT_DIR, "hyperparam_heatmap.png")
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -108,19 +116,21 @@ def plot_heatmap(data):
 
 
 def plot_learning_curves(data):
-    """Learning curves for each (lr, gamma) configuration."""
+    """Steps per episode over training for each (lr, γ) configuration."""
+    steps_data = [d for d in data if d.get("steps") is not None and len(d["steps"]) > 0]
+    if not steps_data:
+        print("No episode_steps.npy found. Skipping learning curves.")
+        return
+
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    for d in sorted(data, key=lambda x: (x["learning_rate"], x["discount_rate"])):
-        rewards = d["rewards"]
-        if len(rewards) == 0:
-            continue
-        smoothed = _smooth(rewards)
+    for d in sorted(steps_data, key=lambda x: (x["learning_rate"], x["discount_rate"])):
+        smoothed = _smooth(d["steps"])
         ax.plot(smoothed, label=d["label"], alpha=0.85)
 
     ax.set_xlabel("Episodes")
-    ax.set_ylabel("Total Reward (smoothed)")
-    ax.set_title("Learning Curves by Hyperparameters")
+    ax.set_ylabel("Steps per Episode (Lower = Better)")
+    ax.set_title("Convergence: Steps per Episode by Hyperparameters")
     ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=8)
     ax.set_xlim(left=0)
     plt.tight_layout()
@@ -131,22 +141,24 @@ def plot_learning_curves(data):
     print(f"Saved: {out}")
 
 
-def plot_best_configs(data, top_n=9):
-    """Bar chart of configurations ranked by final average reward."""
-    sorted_data = sorted(data, key=lambda x: x["final_avg"], reverse=True)[:top_n]
+def plot_leaderboard(data, top_n=9):
+    """Configurations ranked by avg steps (lowest = best)."""
+    sorted_data = sorted(
+        data,
+        key=lambda x: x["avg_steps"] if np.isfinite(x["avg_steps"]) else 1e9
+    )[:top_n]
     labels = [d["label"] for d in sorted_data]
-    scores = [d["final_avg"] for d in sorted_data]
+    scores = [d["avg_steps"] for d in sorted_data]
 
     fig, ax = plt.subplots(figsize=(10, max(5, top_n * 0.35)))
     y_pos = np.arange(len(labels))
-    colors = plt.cm.RdYlGn(np.linspace(0.2, 0.8, len(labels))[::-1])
+    colors = plt.cm.RdYlGn_r(np.linspace(0.2, 0.8, len(labels)))
     ax.barh(y_pos, scores, color=colors)
     ax.set_yticks(y_pos)
     ax.set_yticklabels(labels, fontsize=10)
     ax.invert_yaxis()
-    ax.set_xlabel("Average Reward")
-    ax.set_title("Hyperparameter Configurations (ranked by final avg reward)")
-    ax.axvline(x=0, color="gray", linestyle="--", alpha=0.6)
+    ax.set_xlabel("Avg Steps per Episode (Lower = Better)")
+    ax.set_title("Hyperparameter Configurations (ranked by convergence rate)")
     plt.tight_layout()
     out = os.path.join(OUTPUT_DIR, "hyperparam_leaderboard.png")
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -156,31 +168,31 @@ def plot_best_configs(data, top_n=9):
 
 
 def print_and_save_table(data):
-    """Print summary table and save to text file."""
+    """Summary table sorted by avg steps (ascending)."""
     sorted_data = sorted(
         data,
         key=lambda x: (x["learning_rate"], x["discount_rate"]),
     )
 
     lines = [
-        "=" * 80,
-        "HYPERPARAMETER SWEEP SUMMARY",
+        "=" * 75,
+        "HYPERPARAMETER SWEEP SUMMARY (Convergence: Steps per Episode)",
         "Q-learning | random_negative_init | performance_based | manhattan",
-        "=" * 80,
-        f"{'LR':<8} {'γ':<10} {'Avg R':<10} {'Max R':<10} {'Avg Steps':<12} {'Time(s)':<10}",
-        "-" * 80,
+        "=" * 75,
+        f"{'LR':<8} {'γ':<10} {'Avg Steps':<12} {'Time(s)':<10}",
+        "-" * 75,
     ]
     for d in sorted_data:
         lines.append(
             f"{d['learning_rate']:<8} {d['discount_rate']:<10} "
-            f"{d['final_avg']:<10.2f} {d['max_reward']:<10.2f} "
             f"{d['avg_steps']:<12.1f} {d['total_time']:<10.1f}"
         )
-    lines.append("=" * 80)
+    lines.append("=" * 75)
 
-    best = max(data, key=lambda x: x["final_avg"])
-    lines.append(f"\nBest: lr={best['learning_rate']}, γ={best['discount_rate']} -> avg_reward={best['final_avg']:.2f}")
-    lines.append("=" * 80)
+    best = min(data, key=lambda x: x["avg_steps"] if np.isfinite(x["avg_steps"]) else 1e9)
+    if np.isfinite(best["avg_steps"]):
+        lines.append(f"\nBest: lr={best['learning_rate']}, γ={best['discount_rate']} -> avg_steps={best['avg_steps']:.1f}")
+    lines.append("=" * 75)
 
     text = "\n".join(lines)
     print(text)
@@ -209,7 +221,7 @@ def main():
 
     plot_heatmap(data)
     plot_learning_curves(data)
-    plot_best_configs(data)
+    plot_leaderboard(data)
     print_and_save_table(data)
 
     print(f"\nAll visualizations saved to {OUTPUT_DIR}/")
